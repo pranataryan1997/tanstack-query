@@ -1,6 +1,6 @@
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import Image from "next/image";
-import { useEffect, useState } from "react";
+import { FormEvent, useEffect, useState } from "react";
 
 interface IProduct {
 	id: string;
@@ -10,7 +10,8 @@ interface IProduct {
 }
 
 export default function Home() {
-	const [showToast, setShowToast] = useState(false);
+	const [showToast, setShowToast] = useState<string | null>(null);
+	const [showAddProduct, setShowAddProduct] = useState(false);
 	const [fetchData, setFetchData] = useState(false);
 	const [showProduct, setShowProduct] = useState<string | null>(null);
 
@@ -43,12 +44,43 @@ export default function Home() {
 	// set toast ketika data berhasil di fetch
 	useEffect(() => {
 		if (isSuccess) {
-			setShowToast(true);
+			setShowToast("Success Get Product");
 			setTimeout(() => {
-				setShowToast(false);
+				setShowToast(null);
 			}, 3000);
 		}
 	}, [isSuccess]);
+
+	const { mutate, isPending } = useMutation({
+		mutationFn: async (payload: any) => {
+			return await fetch("https://fakestoreapi.com/products", {
+				method: "POST",
+				body: JSON.stringify(payload),
+			});
+		},
+		onSuccess: () => {
+			setShowToast("Success Add Product");
+			setShowAddProduct(false);
+			setTimeout(() => {
+				setShowToast(null);
+			}, 3000);
+		},
+	});
+
+	const onSubmitProduct = (e: FormEvent) => {
+		e.preventDefault();
+		const form = e.target as HTMLFormElement;
+		const payload = {
+			id: parseInt((form.elements.namedItem("id") as HTMLInputElement).value), // namedItem digunakan untuk mengambil inputan berdasarkan name attribute
+			title: (form.elements.namedItem("title") as HTMLInputElement).value,
+			price: parseInt((form.elements.namedItem("price") as HTMLInputElement).value),
+			description: (form.elements.namedItem("description") as HTMLInputElement).value,
+			category: (form.elements.namedItem("category") as HTMLInputElement).value,
+			image: (form.elements.namedItem("image") as HTMLInputElement).value,
+		};
+		mutate(payload);
+		form.reset(); // reset semua inputan form setelah submit
+	};
 
 	return (
 		<div className="container mx-auto p-8">
@@ -58,7 +90,7 @@ export default function Home() {
 				</button>
 			)}
 
-			{showToast && <div className="fixed top-4 right-4 z-50 shadow-sm bg-green-300 p-4">Success Get Products Data</div>}
+			{showToast !== null && <div className="fixed top-4 right-4 z-50 shadow-sm bg-green-300 p-4">{showToast}</div>}
 
 			{isLoading ? (
 				<div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
@@ -68,19 +100,67 @@ export default function Home() {
 				</div>
 			) : (
 				<div>
-					{isError ? (
-						<div className="text-red-500 text-3xl font-bold">Data Not Found</div>
-					) : (
-						<div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
-							{data?.map((product: IProduct) => (
-								<div key={`product-${product.id}`} className="shadow p-4 flex flex-col items-center" onClick={() => setShowProduct(product.id)}>
-									<Image src={product.image} alt={product.title} width={100} height={100} className="scale-50 h-40 w-fit" />
-									<h4 className="text-center font-bold text-lg line-clamp-1">{product.title}</h4>
-									<p className="text-sm">${product.price}</p>
-								</div>
-							))}
+					{/* Add Product */}
+					<div className="mb-4">
+						<button className="bg-blue-500 text-white px-4 py-2 mt-4" onClick={() => setShowAddProduct(true)}>
+							Add Product
+						</button>
+
+						{/* popup Add Product */}
+						<div className={`fixed h-screen w-screen top-0 bg-black/50 left-0 z-50 ${showAddProduct ? "flex justify-center items-center" : "hidden"}`}>
+							<div className="w-1/4 bg-white relative flex items-center gap-8 p-8">
+								<button className="absolute top-5 right-5" onClick={() => setShowAddProduct(false)}>
+									X
+								</button>
+								<form className="w-full space-y-4" onSubmit={onSubmitProduct}>
+									<label className="flex flex-col" htmlFor="id">
+										ID:
+										<input type="number" id="id" name="id" className="border-2 w-full p-2" />
+									</label>
+									<label className="flex flex-col" htmlFor="title">
+										Title:
+										<input type="text" id="title" name="title" className="border-2 w-full p-2" />
+									</label>
+									<label className="flex flex-col" htmlFor="price">
+										Price:
+										<input type="number" id="price" name="price" className="border-2 w-full p-2" />
+									</label>
+									<label className="flex flex-col" htmlFor="description">
+										Description:
+										<input type="text" id="description" name="description" className="border-2 w-full p-2" />
+									</label>
+									<label className="flex flex-col" htmlFor="category">
+										Category:
+										<input type="text" id="category" name="category" className="border-2 w-full p-2" />
+									</label>
+									<label className="flex flex-col" htmlFor="image">
+										Image:
+										<input type="text" id="image" name="image" className="border-2 w-full p-2" />
+									</label>
+									<button className="w-full bg-black text-white px-4 py-2 font-bold">{isPending ? "Loading..." : "Submit"}</button>
+								</form>
+							</div>
 						</div>
-					)}
+					</div>
+					{/* End Add Product */}
+
+					{/* Show Product */}
+					<div>
+						{isError ? (
+							<div className="text-red-500 text-3xl font-bold">Data Not Found</div>
+						) : (
+							<div className="grid grid-cols-1 gap-4 lg:grid-cols-5">
+								{data?.map((product: IProduct) => (
+									<div key={`product-${product.id}`} className="shadow p-4 flex flex-col items-center" onClick={() => setShowProduct(product.id)}>
+										<Image src={product.image} alt={product.title} width={100} height={100} className="scale-50 h-40 w-fit" />
+										<h4 className="text-center font-bold text-lg line-clamp-1">{product.title}</h4>
+										<p className="text-sm">${product.price}</p>
+									</div>
+								))}
+							</div>
+						)}
+					</div>
+					{/* End Show Product */}
 				</div>
 			)}
 
